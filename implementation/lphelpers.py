@@ -6,7 +6,7 @@ class tracer :
         self.levels = {'ERROR':1, 'WARNING':2, 'INFO':3, 'DEBUG':4}
         if trace_level not in self.levels:
             raise ValueError(f"Invalid trace level: {trace_level}")
-        self.trace_level = self.levels[trace_level]
+        self.level = self.levels[trace_level]
         self.default_color = default_color
 
     @staticmethod     
@@ -37,13 +37,13 @@ class tracer :
         print(self.colorstring(s, color))
 
     def error(self, s):
-        if self.trace_level >= self.levels['ERROR'] : self.colorprint('[ERROR]: ' + s, color='RED')
+        if self.level >= self.levels['ERROR'] : self.colorprint('[ERROR]: ' + s, color='RED')
     def warn(self, s):
-        if self.trace_level >= self.levels['WARNING'] : self.colorprint('[WARNING]: ' + s, color='YELLOW')
+        if self.level >= self.levels['WARNING'] : self.colorprint('[WARNING]: ' + s, color='YELLOW')
     def info(self, s):
-        if self.trace_level >= self.levels['INFO'] : self.colorprint('[INFO]: ' + s, color='WHITE')
+        if self.level >= self.levels['INFO'] : self.colorprint('[INFO]: ' + s, color='WHITE')
     def debug(self, s):
-        if self.trace_level >= self.levels['DEBUG'] : self.colorprint('[DEBUG]: ' + s, color='BLUE')
+        if self.level >= self.levels['DEBUG'] : self.colorprint('[DEBUG]: ' + s, color='BLUE')
 
     def sepline(self, size:int, text:str = None, char:str='_', color:str='DEFAULT'):
         if text:
@@ -79,3 +79,16 @@ class tracer :
         self.sepline(sepline_len, text=Nel_str, char='-', color=color)
         self.colorprint(matrix_str, color=color)
         self.sepline(sepline_len, color=color)
+
+def print_header(text:str, color:str='WHITE', size:int=60):
+    tr = tracer(default_color=color)
+    print()
+    tr.sepline(size=size, char='-')
+    tr.sepline(size=size, text=text, char=' ')
+    tr.sepline(size=size, char='-')
+
+def colorprint(s:str, color:str='DEFAULT'):
+    tracer().colorprint(s, color)
+
+def sepline(size:int, text:str = None, char:str='_', color:str='DEFAULT'):
+    tracer().sepline(size, text, char, color)
