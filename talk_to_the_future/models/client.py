@@ -1,4 +1,3 @@
-from models.user_infos import UserInfos
 from models.server import Server
 from models.message import AAD, Message
 from utils.logger import Tracer
@@ -15,23 +14,20 @@ class Client:
         self.tr:Tracer = tr     # Tracer to handle general verbosity of the User
                                 # 4 possible levels: ERROR, WARNING, INFO, DEBUG
     
-    # Private methods -------------------------------------------
-    def __gen_public_infos(self) -> UserInfos:
+    # Public methods -------------------------------------------------------
+    def register_on(self, server: Server) -> bool:
+        self.server = server
 
+        username = self.name
+        
         self.tr.debug(f'[{self.name}]: Drawing a random salt...')
         salt = generate_salt()
 
         self.tr.debug(f'[{self.name}]: Hashing password...')
         pwd_verifier = hash_password(self.__password, salt)
-
-        return UserInfos(self.name, pwd_verifier, salt)
-
-    # Public methods -------------------------------------------------------
-    def register_on(self, server: Server) -> bool:
-        self.server = server
-        public_infos = self.__gen_public_infos()
+        
         self.tr.debug(f'[{self.name}]: Request a registration on {server}')
-        return server.register(public_infos)
+        return server.register(username, pwd_verifier, salt)
 
     def login_on(self, server: Server) -> bool:
         self.server = server
@@ -52,9 +48,17 @@ class Client:
 
     def change_password(self, new_password: str) -> bool:
         self.__password = new_password.encode()
-        public_infos = self.__gen_public_infos() # Generate new public infos using new password (new salt as well)
-        self.tr.debug(f'[{self.name}]: Request a passord update on {self.server}')
-        return self.server.update_user_credentials(public_infos)
+        
+        username = self.name
+        
+        self.tr.debug(f'[{self.name}]: Drawing a random salt...')
+        salt = generate_salt()
+
+        self.tr.debug(f'[{self.name}]: Hashing password...')
+        pwd_verifier = hash_password(self.__password, salt)
+        
+        self.tr.debug(f'[{self.name}]: Request a registration on {self.server}')
+        return self.server.update_user_credentials(username, pwd_verifier, salt)
 
     def send_message(self, data: str, recipient_name: str, unlock_day: date) -> bool:
         self.tr.debug(f'[{self.name}]: Getting {recipient_name} public key on {self.server}')

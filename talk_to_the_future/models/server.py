@@ -22,12 +22,12 @@ class Server:
         return None
     
     # Public methods -----------------------------------------------------------------------
-    def register(self, new_user: UserInfos) -> bool: 
-        if all(user.name != new_user.name  for user in self.__users):
-            self.__users.append(new_user)
-            self.tr.info(f"[{self}]: New user {new_user.name} was added!")
+    def register(self, username:str, pwd_verifier: bytes, salt: bytes) -> bool: 
+        if all(user.name != username  for user in self.__users):
+            self.__users.append(UserInfos(username, pwd_verifier, salt))
+            self.tr.info(f"[{self}]: New user {username} was added!")
             return True
-        self.tr.error(f"[{self}]: User {new_user.name} already exists!")
+        self.tr.error(f"[{self}]: User {username} already exists!")
         return False
     
     def remove(self, requester_name) -> None :
@@ -64,12 +64,12 @@ class Server:
         self.tr.info(f"[{self}]: {requester_name} has been logged out.")
         return True
 
-    def update_user_credentials(self, requester: UserInfos) -> bool :
-        user = self.__get_user_by_name(requester.name, check_login=True)
+    def update_user_credentials(self, username:str, pwd_verifier: bytes, salt: bytes) -> bool :
+        user = self.__get_user_by_name(username, check_login=True)
         if not user :
             return False
-        user.pwd_verifier = requester.pwd_verifier
-        user.salt = requester.salt
+        user.pwd_verifier = pwd_verifier
+        user.salt = salt
         self.tr.info(f"[{self}]: Password updated for {user.name}.")
         return True
         
