@@ -99,21 +99,51 @@ class Server:
         self.tr.info(f"[{self}]: Message sent to {recipient.name}.")               
         return True
     
-    def get_metadata(self, name: str) -> list[Message] | None:
+    def get_metadata(self, name: str) -> list[AAD] | None:
         user = self.__get_user_by_name(name, check_login=True)
         if not user:
             return None
-        return [m.aad for m in user.received_messages]
+        return [msg.aad for msg in user.received_messages]
     
-    def get_message(self, id: int, username: str) -> Message | None:
+    def get_message(self, message_id: int, username: str, no_key: bool = False) -> Message | None:
         user = self.__get_user_by_name(username, check_login=True)
-        if not user or id > len(user.received_messages):
+        if not user:
             return None
-        message = user.received_messages[id]
+        
+        if not (0 <= message_id < len(user.received_messages)):
+            self.tr.error(f"[{self}]: Message (id:{message_id}) does not exist for user {username}")
+            return None
+
+        message = user.received_messages[message_id]
+
         if date.today() < message.aad.unlock_day:
-            self.tr.warn(f"[{self}]: You are not allowed to read this message yet.")
-            return None
+            if no_key:
+                self.tr.info(f"[{self}]: Returning future message (id:{message_id}) without key")
+                return Message(data=message.data, aad=message.aad, key=None)
+            else:
+                self.tr.warn(f"[{self}]: Access to message (id:{message_id}) is restricted until {message.aad.unlock_day}")
+                return None
+            
+        self.tr.info(f"[{self}]: Returning message (id:{message_id}) with key")
         return message
     
+    def get_message_key(self, message_id:int , username: str) -> bytes | None:
+        user = self.__get_user_by_name(username, check_login=True)
+        if not user:
+            return None
+        
+        if not (0 <= message_id < len(user.received_messages)):
+            self.tr.error(f"[{self}]: Message (id:{message_id}) does not exist for user {username}")
+            return None
+        
+        message:Message = user.received_messages[message_id]
+
+        if date.today() < message.aad.unlock_day:
+            self.tr.warn(f"[{self}]: Key for message (id:{message_id}) not available until {message.aad.unlock_day}")
+            return None
+        
+        return message.key
+        
+
     def __str__(self):
         return f"{self.name}"

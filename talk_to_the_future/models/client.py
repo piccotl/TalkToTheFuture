@@ -84,21 +84,28 @@ class Client:
         self.tr.debug(f'[{self.name}]: Sending message on {self.server}')
         return self.server.store_message(message)
 
-    def get_my_messages(self) -> Message | None:
-        self.tr.debug(f'[{self.name}]: Requesting messages metadata from {self.server}')
+    def get_my_messages(self) -> list[AAD] | None:
+        self.tr.debug(f'[{self.name}]: Requesting message metadata from {self.server}')
         return self.server.get_metadata(self.name)
     
-    def read_message(self, id: int) -> str | None:
-        self.tr.debug(f'[{self.name}]: Requesting message {id} from {self.server}')
-        message = self.server.get_message(id, self.name)
-        if not message: 
-            self.tr.warn(f'[{self.name}]: Message with id: {id} does not exist or is not available yet')
-            return None
-        
-        self.tr.debug(f'[{self.name}]: Decrypting message data')
-        decrypted = decrypt_message(encrypted=message.data, aad=message.aad.encode(), key=message.key)
-        if decrypted :
-            return decrypted.decode('utf-8')
+    def read_message(self, message_id: int) -> str | None:
+        self.tr.debug(f'[{self.name}]: Requesting full message (id:{message_id}) from {self.server}')
+        message = self.server.get_message(message_id, self.name)
 
+        if not message: 
+            self.tr.error(f'[{self.name}]: Unable to read message (id:{message_id})')
+            return None
+
+        self.tr.debug(f'[{self.name}]: Decrypting message content')
+        return decrypt_message(encrypted=message.data, aad=message.aad.encode(), key=message.key).decode('utf-8')
+        
+    def download_future_message(self, message_id: int) -> Message | None:
+        self.tr.debug(f'[{self.name}]: Downloading future message (id:{message_id}) without key')
+        return self.server.get_message(message_id, self.name, no_key=True)
+    
+    def get_message_key(self, message_id: int) -> bytes:
+        self.tr.debug(f'[{self.name}]: Requesting key for message (id:{message_id})')
+        return self.server.get_message_key(message_id, self.name)
+    
     def __str__(self):
         return f"{self.name}"
