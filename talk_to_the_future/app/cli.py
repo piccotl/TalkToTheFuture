@@ -2,11 +2,12 @@ from utils.logger import Tracer, print_header
 from models import Client, Server
 import questionary
 import sys
+from datetime import date, datetime
 
 class TalkToTheFutureCLI:
     def __init__(self, trace_level='DEBUG'):
         self.tracer = Tracer(trace_level=trace_level, default_color='LIGHTYELLOW_EX')
-        self.server = Server(name='3TF - Server', tr=self.tracer)
+        self.server = Server(name='Server', tr=self.tracer)
 
     def run(self) -> None:
         self.tracer.colorprint("\nWelcome to TalkToTheFuture!")
@@ -28,7 +29,7 @@ class TalkToTheFutureCLI:
                     self.exit_app()
     
     def user_menu(self, client: Client) -> None:
-        print_header(text=f'{client.name} - Menu', color='LIGHTGREEN_EX')
+        print_header(text=f'{client.name} - Session Menu', color='LIGHTGREEN_EX')
         choices  = [
             "Send a message",
             "Read my messages",
@@ -39,15 +40,38 @@ class TalkToTheFutureCLI:
         choice = questionary.select("Choose an option?",choices).ask()
         match choice:
             case "Send a message":
-                self.tracer.colorprint('TO DO', color='yellow')
+                result = self.ask_message()
+                if result :
+                    content, recipient, unlock_date = result
+                    client.send_message(content, recipient, unlock_date)
+                self.user_menu(client)
             case "Read my messages":
-                self.tracer.colorprint('TO DO', color='yellow')
+                self.read_menu(client)
+                self.user_menu(client)
             case "Change my password":
                 client.change_password(self.ask_new_password())
             case "Logout":
                 client.logout()
             case "Exit":
                 self.exit_app()
+    
+    def read_menu(self, client: Client) -> None:
+        print_header(text=f'{client.name} - Read Menu', color='LIGHTCYAN_EX')
+        messages = client.get_my_messages()
+        if not messages :
+            self.tracer.colorprint("\nYou didn't receive any message!\n")
+            return
+        choices = [questionary.Choice(title=f"id {i}: {msg}", value=i) for i, msg in enumerate(messages)]
+        selected_id = questionary.select("Choose the message you want to read",choices).ask()
+        
+        content = client.read_message(selected_id)
+        if not content:
+            self.tracer.colorprint("Your message could not be read")
+            return None
+        self.tracer.colorprint(f"\nMessage {selected_id} : {messages[selected_id]}")
+        self.tracer.sepline(60)
+        self.tracer.colorprint(content, color='YELLOW')
+
 
     def ask_credentials(self) -> Client:
         username:str = questionary.text('Username:').ask()
@@ -57,6 +81,19 @@ class TalkToTheFutureCLI:
     def ask_new_password(self) -> str:
         return questionary.password('New password:').ask()
     
+    def ask_message(self) -> tuple[str, str, date] | None:
+        recipient:str = questionary.text('To:').ask()
+        content:str = questionary.text('Message:').ask()
+        unlock_date_str:str = questionary.text("Unlock date (YYYY-MM-DD):", default="2002-05-29").ask()
+
+        try:
+            unlock_date:date = datetime.strptime(unlock_date_str, "%Y-%m-%d").date()
+        except ValueError:
+            self.tracer.error("Invalid date format. Please use YYYY-MM-DD.")
+            return None
+        return content, recipient, unlock_date
+    
     def exit_app(self) -> None:
         self.tracer.colorprint("\nThank you for using TalkToTheFuture!\n")
         sys.exit()
+
