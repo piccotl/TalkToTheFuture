@@ -92,7 +92,7 @@ class Client:
         self.tr.debug(f'[{self.name}]: Requesting message {id} from {self.server}')
         message = self.server.get_message(id, self.name)
         if not message: 
-            self.tr.error(f'[{self.name}]: Message with id: {id} does not exist')
+            self.tr.warn(f'[{self.name}]: Message with id: {id} does not exist or is not available yet')
             return None
         
         self.tr.debug(f'[{self.name}]: Decrypting message data')

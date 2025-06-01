@@ -1,6 +1,7 @@
 from models.user_infos import UserInfos
 from models.message import AAD, Message
 from utils.logger import Tracer
+from datetime import date
 
 class Server: 
     def __init__(self, name:str='Server', tr:Tracer = Tracer(trace_level='DEBUG')):
@@ -108,7 +109,11 @@ class Server:
         user = self.__get_user_by_name(username, check_login=True)
         if not user or id > len(user.received_messages):
             return None
-        return user.received_messages[id]
-
+        message = user.received_messages[id]
+        if date.today() < message.aad.unlock_day:
+            self.tr.warn(f"[{self}]: You are not allowed to read this message yet.")
+            return None
+        return message
+    
     def __str__(self):
         return f"{self.name}"
