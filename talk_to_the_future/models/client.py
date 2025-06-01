@@ -11,6 +11,7 @@ class Client:
     def __init__(self, name: str, password: str, tr:Tracer = Tracer(trace_level='DEBUG')):
         self.name:str = name
         self.__password:bytes = password.encode() # (private attribute)
+        self.server: Server = None
         self.tr:Tracer = tr     # Tracer to handle general verbosity of the User
                                 # 4 possible levels: ERROR, WARNING, INFO, DEBUG
     
@@ -27,36 +28,39 @@ class Client:
 
     # Public methods -------------------------------------------------------
     def register_on(self, server: Server) -> bool:
+        self.server = server
         public_infos = self.__gen_public_infos()
         self.tr.debug(f'[{self.name}]: Request a registration on {server}')
         return server.register(public_infos)
 
     def login_on(self, server: Server) -> bool:
-        self.tr.debug(f'[{self.name}]: Getting salt from {server}')
-        salt = server.get_user_salt(self.name)                                  
+        self.server = server
+
+        self.tr.debug(f'[{self.name}]: Getting salt from {self.server}')
+        salt = self.server.get_user_salt(self.name)                                  
         if (not salt): return False
 
         self.tr.debug(f'[{self.name}]: Recomputing pwd_verifier')
         pwd_verifier = hash_password(self.__password, salt)
 
-        self.tr.debug(f'[{self.name}]: Sending login request to {server}')
-        return server.login(self.name, pwd_verifier)
+        self.tr.debug(f'[{self.name}]: Sending login request to {self.server}')
+        return self.server.login(self.name, pwd_verifier)
 
-    def logout_from(self, server: Server) -> bool:
-        self.tr.debug(f'[{self.name}]: Sending logout request to {server}')
-        return server.logout(self.name)
+    def logout(self) -> bool:
+        self.tr.debug(f'[{self.name}]: Sending logout request to {self.server}')
+        return self.server.logout(self.name)
 
-    def change_password_on(self, server: Server, new_password: str) -> bool:
+    def change_password(self, new_password: str) -> bool:
         self.__password = new_password.encode()
         public_infos = self.__gen_public_infos() # Generate new public infos using new password (new salt as well)
-        self.tr.debug(f'[{self.name}]: Request a passord update on {server}')
-        return server.update_user_credentials(public_infos)
+        self.tr.debug(f'[{self.name}]: Request a passord update on {self.server}')
+        return self.server.update_user_credentials(public_infos)
 
-    def send_message(self, data: str, recipient_name: str, unlock_day: date, server: Server) -> bool:
-        self.tr.debug(f'[{self.name}]: Getting {recipient_name} public key on {server}')
-        recipient_pk = server.get_public_key(recipient_name)
+    def send_message(self, data: str, recipient_name: str, unlock_day: date) -> bool:
+        self.tr.debug(f'[{self.name}]: Getting {recipient_name} public key on {self.server}')
+        recipient_pk = self.server.get_public_key(recipient_name)
         if not recipient_pk:
-            self.tr.error(f'[{self.name}]: No public key associated to {recipient_name} on ({server})')
+            self.tr.error(f'[{self.name}]: No public key associated to {recipient_name} on ({self.server})')
             return False
 
         # generate a public key to crypt the message
@@ -76,20 +80,17 @@ class Client:
 
         # Pack message
         message = Message(encrypted, aad, crypted_sym_key)
-        
-        decrypted = decrypt_message(encrypted=message.data, aad=message.aad.encode(), key=message.key)
-        self.tr.colorprint(decrypted.decode('utf-8'), 'yellow')
 
-        self.tr.debug(f'[{self.name}]: Sending message on {server}')
-        return server.store_message(message)
+        self.tr.debug(f'[{self.name}]: Sending message on {self.server}')
+        return self.server.store_message(message)
 
-    def get_my_messages(self, server: Server) -> Message | None:
-        self.tr.debug(f'[{self.name}]: Requesting messages metadata from {server}')
-        return server.get_metadata(self.name)
+    def get_my_messages(self) -> Message | None:
+        self.tr.debug(f'[{self.name}]: Requesting messages metadata from {self.server}')
+        return self.server.get_metadata(self.name)
     
-    def read_message(self, server: Server, id: int) -> str | None:
-        self.tr.debug(f'[{self.name}]: Requesting message {id} from {server}')
-        message = server.get_message(id, self.name)
+    def read_message(self, id: int) -> str | None:
+        self.tr.debug(f'[{self.name}]: Requesting message {id} from {self.server}')
+        message = self.server.get_message(id, self.name)
         if not message: 
             self.tr.error(f'[{self.name}]: Message with id: {id} does not exist')
             return None

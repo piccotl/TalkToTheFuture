@@ -43,9 +43,9 @@ class TalkToTheFutureCLI:
             case "Read my messages":
                 self.tracer.colorprint('TO DO', color='yellow')
             case "Change my password":
-                client.change_password_on(self.server, self.ask_new_password())
+                client.change_password(self.ask_new_password())
             case "Logout":
-                client.logout_from(self.server)
+                client.logout()
             case "Exit":
                 self.exit_app()
 
