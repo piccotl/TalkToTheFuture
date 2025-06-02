@@ -42,8 +42,8 @@ class TalkToTheFutureCLI:
             case "Send a message":
                 result = self.ask_message()
                 if result :
-                    content, recipient, unlock_date = result
-                    client.send_message(content, recipient, unlock_date)
+                    content, receiver, unlock_date = result
+                    client.send_message(content, receiver, unlock_date)
                 self.user_menu(client)
             case "Read my messages":
                 self.read_menu(client)
@@ -82,7 +82,7 @@ class TalkToTheFutureCLI:
         return questionary.password('New password:').ask()
     
     def ask_message(self) -> tuple[str, str, date] | None:
-        recipient:str = questionary.text('To:').ask()
+        receiver:str = questionary.text('To:').ask()
         content:str = questionary.text('Message:').ask()
         unlock_date_str:str = questionary.text("Unlock date (YYYY-MM-DD):", default="2002-05-29").ask()
 
@@ -91,7 +91,7 @@ class TalkToTheFutureCLI:
         except ValueError:
             self.tracer.error("Invalid date format. Please use YYYY-MM-DD.")
             return None
-        return content, recipient, unlock_date
+        return content, receiver, unlock_date
     
     def exit_app(self) -> None:
         self.tracer.colorprint("\nThank you for using TalkToTheFuture!\n")

@@ -87,8 +87,8 @@ class Server:
         for user in self.__users:
             self.tr.info(user.name)
     
-    def get_public_key(self, recipient:str) -> bool | None:
-        user = self.__get_user(recipient)
+    def get_public_key(self, receiver:str) -> bool | None:
+        user = self.__get_user(receiver)
         if not user :
             return None
         # return user.public_key
@@ -103,13 +103,13 @@ class Server:
             self.tr.error(f"[{self}]: The session holder must be the sender of the message")
             return False
         
-        # get and check recipient from authenticated data
-        recipient = self.__get_user(message.aad.recipient)
-        if not recipient:
+        # get and check receiver from authenticated data
+        receiver = self.__get_user(message.aad.receiver)
+        if not receiver:
             return False
-        recipient.received_messages.append(message)
+        receiver.received_messages.append(message)
         
-        self.tr.info(f"[{self}]: Message sent to {recipient.name}.")               
+        self.tr.info(f"[{self}]: Message sent to {receiver.name}.")               
         return True
     
     def get_metadata(self, username: str, token: str) -> list[AAD] | None:

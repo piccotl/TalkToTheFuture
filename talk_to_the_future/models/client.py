@@ -63,27 +63,27 @@ class Client:
         self.tr.debug(f'[{self.name}]: Updating credentials on {self.server}')
         return self.server.update_user_credentials(self.name, self.token, pwd_verifier, salt)
 
-    def send_message(self, data: str, recipient_name: str, unlock_day: date) -> bool:
-        self.tr.debug(f'[{self.name}]: Getting {recipient_name} public key on {self.server}')
-        recipient_pk = self.server.get_public_key(recipient_name)
-        if not recipient_pk:
-            self.tr.error(f'[{self.name}]: No public key associated to {recipient_name} on ({self.server})')
+    def send_message(self, data: str, receiver_name: str, unlock_day: date) -> bool:
+        self.tr.debug(f'[{self.name}]: Getting {receiver_name} public key on {self.server}')
+        receiver_pk = self.server.get_public_key(receiver_name)
+        if not receiver_pk:
+            self.tr.error(f'[{self.name}]: No public key associated to {receiver_name} on ({self.server})')
             return False
 
         # generate a public key to crypt the message
         self.tr.debug(f'[{self.name}]: Generating a public key')
         sym_key = gen_symmetric_key() 
         
-        # Authenticated data : sender | recipient | date
-        aad = AAD(sender=self.name, recipient=recipient_name, unlock_day=unlock_day)
+        # Authenticated data : sender | receiver | date
+        aad = AAD(sender=self.name, receiver=receiver_name, unlock_day=unlock_day)
 
         # encrypt message using AEAD 
         self.tr.debug(f'[{self.name}]: Encrypting message data')
         encrypted = encrypt_message(data.encode(), aad.encode(), sym_key)
 
-        # TODO : Encrypt the AEAD encryption key using recipient public key
+        # TODO : Encrypt the AEAD encryption key using receiver public key
         self.tr.debug(f'[{self.name}]: Encrypting symmetric key')
-        crypted_sym_key = encrypt_sym_key(sym_key, recipient_pk)
+        crypted_sym_key = encrypt_sym_key(sym_key, receiver_pk)
 
         # Pack message
         message = Message(encrypted, aad, crypted_sym_key)
