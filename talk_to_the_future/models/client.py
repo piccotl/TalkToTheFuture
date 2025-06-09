@@ -51,7 +51,7 @@ class Client:
         self.server = server
 
         self.tr.debug(f'[{self.name}]: Getting salt from {self.server}')
-        salt = self.server.get_user_salt(username=self.name)                                  
+        salt = self.server.get_user_salt(self.name)                                  
         if (not salt): return False
 
         self.tr.debug(f'[{self.name}]: Regenerating keys ...')
@@ -72,7 +72,7 @@ class Client:
             bool: True if logout succeeded else false.
         '''
         self.tr.debug(f'[{self.name}]: Sending logout request to {self.server}')
-        return self.server.logout(username=self.name, token=self.token)
+        return self.server.logout(self.name, self.token)
 
     def change_password(self, new_password: str) -> bool:
         '''
@@ -119,7 +119,7 @@ class Client:
         message = encrypt_and_sign(content.encode(), aad.encode(), receiver_pub_key, self.__private_keys["signing_key"])
 
         self.tr.debug(f'[{self.name}]: Sending message on {self.server}')
-        return self.server.send_message(sender=self.name, token=self.token, message=message)
+        return self.server.send_message(self.name, self.token, message)
 
     def get_messages_aad(self) -> list[AAD] | None:
         '''
@@ -129,7 +129,7 @@ class Client:
             list[AAD]: An AAD object (From|To|Unlock_day) for each received message.
         '''
         self.tr.debug(f'[{self.name}]: Requesting message metadata from {self.server}')
-        return self.server.get_messages_aad(username=self.name, token=self.token)
+        return self.server.get_messages_aad(self.name, self.token)
     
     def read_message(self, message_id: int) -> str | None:
         '''
@@ -143,7 +143,7 @@ class Client:
             str: Plaintext content of desired message.
         '''
         self.tr.debug(f'[{self.name}]: Requesting full message (id:{message_id}) from {self.server}')
-        encoded_msg = self.server.get_message_payload(username=self.name, token=self.token, message_id=message_id, no_key=False)
+        encoded_msg = self.server.get_message_payload(self.name, self.token, message_id, no_key=False)
 
         if not encoded_msg: 
             self.tr.error(f'[{self.name}]: Unable to read message (id:{message_id})')
@@ -163,7 +163,7 @@ class Client:
             dict[str, bytes]: Dictionary containing ciphertext, aad, signature, sender_verify_key
         '''
         self.tr.debug(f'[{self.name}]: Downloading future message (id:{message_id}) without key')
-        return self.server.get_message_payload(username=self.name, token=self.token, message_id=message_id, no_key=True)
+        return self.server.get_message_payload(self.name, self.token, message_id, no_key=True)
     
     def get_msg_enc_sym_key(self, message_id: int) -> bytes | None:
         '''
@@ -176,7 +176,7 @@ class Client:
             bytes: `enc_sym_key` to decrypt message `message_id`
         '''
         self.tr.debug(f'[{self.name}]: Requesting key for message (id:{message_id})')
-        enc_sym_key = self.server.get_message_key(username=self.name, token=self.token, message_id=message_id)
+        enc_sym_key = self.server.get_message_key(self.name, self.token, message_id)
 
         if not enc_sym_key: 
             self.tr.error(f'[{self.name}]: Unable to get symmetric key for this message (id:{message_id})')
@@ -194,6 +194,19 @@ class Client:
             str: Plaintext content of `message`.
         '''
         return decrypt_and_verify(payload=message, receiver_private_key=self.__private_keys["private_key"]).decode('utf-8')
+    
+    def delete_message(self, message_id: int) -> bool:
+        '''
+        Ask `self.server` to delete the message with a given `message_id`.
+
+        Args:
+            `message_id` (int): Desired message ID.
+        
+        Returns:
+            bool: True if succeed, else False
+        '''
+       
+        return self.server.delete_message(self.name, self.token, message_id)
     
     def __str__(self):
         return f"{self.name}"

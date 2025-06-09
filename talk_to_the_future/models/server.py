@@ -113,7 +113,11 @@ class Server:
         if not {"salt", "password_tag", "public_key", "verify_key"} <= new_keys.keys():
             self.tr.error(f"[{self}]: User {username} needs to provide every key to update his keys!")
             return False
+        
+        # Delete all messages as client won't have the key to read them anymore
+        user.received_messages.clear() 
 
+        # Update keys
         user.keys = new_keys
         self.tr.info(f"[{self}]: Keys updated for {username}.")
         return True
@@ -204,6 +208,18 @@ class Server:
             return None
         
         return message["enc_sym_key"]
+    
+    def delete_message(self, username: str, token: str, message_id:int) -> bool:
+        if not self.__check_session(username, token):
+            return False        
+        user: UserInfos = self.__get_user(username)
+        
+        if not (0 <= message_id < len(user.received_messages)):
+            self.tr.error(f"[{self}]: Message (id:{message_id}) does not exist for user {username}")
+            return False
+        
+        user.received_messages.pop(message_id)
+        return True
         
     def __str__(self):
         return f"{self.name}"

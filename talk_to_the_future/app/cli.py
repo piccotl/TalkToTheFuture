@@ -49,7 +49,8 @@ class TalkToTheFutureCLI:
                 self.read_menu(client)
                 self.user_menu(client)
             case "Change my password":
-                client.change_password(self.ask_new_password())
+                if questionary.confirm("This action will delete all your messages, are you sure?").ask():
+                    client.change_password(self.ask_new_password())
             case "Logout":
                 client.logout()
             case "Exit":
