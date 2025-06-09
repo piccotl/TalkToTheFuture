@@ -1,8 +1,8 @@
 from models.user_infos import UserInfos
-from models.message import AAD, Message
+from models.aad import AAD
 from utils.logger import Tracer
 from datetime import date
-from crypto.token import gen_token
+from crypto import generate_token
 
 class Server: 
     def __init__(self, name:str='Server', tr:Tracer = Tracer(trace_level='DEBUG')):
@@ -31,13 +31,23 @@ class Server:
         return True
 
     # Public methods -----------------------------------------------------------------------
-    def register(self, username:str, pwd_verifier: bytes, salt: bytes) -> bool: 
-        if all(user.name != username  for user in self.__users):
-            self.__users.append(UserInfos(username, pwd_verifier, salt))
-            self.tr.info(f"[{self}]: New user {username} was added!")
-            return True
-        self.tr.error(f"[{self}]: User {username} already exists!")
-        return False
+    def register(self, username: str, keys: dict[str, bytes]) -> bool:
+
+        # Check if user already exists
+        if not all(user.name != username  for user in self.__users):
+            self.tr.error(f"[{self}]: User {username} already exists!")
+            return False
+
+        # Check if all expected public keys are provided 
+        if not {"salt", "password_tag", "public_key", "verify_key"} <= keys.keys():
+            self.tr.error(f"[{self}]: User {username} needs to provide every key to register!")
+            return False
+        
+        # Add user
+        self.__users.append(UserInfos(username, keys))
+        self.tr.info(f"[{self}]: New user {username} was added!")
+        return True
+        
     
     def remove(self, username: str, token: str) -> bool :
         if not self.__check_session(username, token):
@@ -52,16 +62,16 @@ class Server:
         user = self.__get_user(username)
         if not user:
             return None
-        return user.salt
+        return user.keys["salt"]
     
     def login(self, username:str, pwd_verifier:bytes) -> str | None :
         user = self.__get_user(username)
         if not user :
             return None
-        if user.pwd_verifier != pwd_verifier :
+        if user.keys["password_tag"] != pwd_verifier :
             self.tr.error(f'[{self}]: Wrong password!')
             return None
-        token: str = gen_token()
+        token: str = generate_token()
         self.__sessions[username] = token
         self.tr.info(f'[{self}]: User {username} is now connected!')
         return token
@@ -73,43 +83,58 @@ class Server:
         self.tr.info(f"[{self}]: {username} has been logged out.")
         return True
 
-    def update_user_credentials(self, username:str, token: str, new_pwd_verifier: bytes, new_salt: bytes) -> bool :
+    def update_keys(self, username:str, token: str, new_keys: dict[str, bytes]) -> bool :
+        # Check user session
         if not self.__check_session(username, token):
-            self.tr.warn(f"[{self}]: {username} must be logged in to update credentials")
+            self.tr.warn(f"[{self}]: {username} must be logged in to update his keys")
             return False
-        user: UserInfos = self.__get_user(username)
-        user.pwd_verifier = new_pwd_verifier
-        user.salt = new_salt
-        self.tr.info(f"[{self}]: Password updated for {username}.")
+        user = self.__get_user(username)
+
+        # Check if all expected public keys are provided 
+        if not {"salt", "password_tag", "public_key", "verify_key"} <= new_keys.keys():
+            self.tr.error(f"[{self}]: User {username} needs to provide every key to update his keys!")
+            return False
+
+        user.keys = new_keys
+        self.tr.info(f"[{self}]: Keys updated for {username}.")
         return True
         
     def show_registered_users(self):
         for user in self.__users:
             self.tr.info(user.name)
     
-    def get_public_key(self, receiver:str) -> bool | None:
+    def get_public_key(self, receiver: str) -> bytes | None:
         user = self.__get_user(receiver)
         if not user :
             return None
-        # return user.public_key
-        return True # return true for now later return user's public_key
+        return user.keys["public_key"]
     
-    def store_message(self, sender: str, token: str, message: Message)-> bool:
+    def send_message(self, sender: str, token: str, message: dict[str, bytes])-> bool:
+        # Check sender existancy and session
+        sender_infos = self.__get_user(sender)
+        if not sender_infos :
+            return False
         if not self.__check_session(sender, token):
             return False
         
+        # Get Authenticated data
+        aad = AAD.decode(message["aad"])
+
         # check sender from authenticated data
-        if sender != message.aad.sender :
+        if sender_infos.name != aad.sender :
             self.tr.error(f"[{self}]: The session holder must be the sender of the message")
             return False
         
         # get and check receiver from authenticated data
-        receiver = self.__get_user(message.aad.receiver)
+        receiver = self.__get_user(aad.receiver)
         if not receiver:
             return False
+        
+        # Add sender's verify_key so receiver can check the signature
+        message["verify_key"] = sender_infos.keys["verify_key"] 
         receiver.received_messages.append(message)
         
-        self.tr.info(f"[{self}]: Message sent to {receiver.name}.")               
+        self.tr.info(f"[{self}]: Message sent to {receiver.name}.")         
         return True
     
     def get_metadata(self, username: str, token: str) -> list[AAD] | None:
@@ -117,9 +142,9 @@ class Server:
             return None        
         user = self.__get_user(username)
         self.tr.debug(f"[{self}]: Returning {username}'s messages")
-        return [msg.aad for msg in user.received_messages]
+        return [AAD.decode(msg["aad"]) for msg in user.received_messages]
     
-    def get_message(self, username: str, token: str, message_id: int, no_key: bool = False) -> Message | None:
+    def get_message(self, username: str, token: str, message_id: int, no_key: bool = False) -> dict[str, bytes] | None:
         if not self.__check_session(username, token):
             return None        
         user: UserInfos = self.__get_user(username)
@@ -128,14 +153,16 @@ class Server:
             self.tr.error(f"[{self}]: Message (id:{message_id}) does not exist for user {username}")
             return None
 
-        message = user.received_messages[message_id]
+        message = user.received_messages[message_id].copy()
+        unlock_day = AAD.decode(message["aad"]).unlock_day
 
-        if date.today() < message.aad.unlock_day:
+        if date.today() < unlock_day:
             if no_key:
                 self.tr.debug(f"[{self}]: Returning future message (id:{message_id}) without key")
-                return Message(data=message.data, aad=message.aad, key=None)
+                del message["enc_sym_key"]
+                return message
             else:
-                self.tr.warn(f"[{self}]: Access to message (id:{message_id}) is restricted until {message.aad.unlock_day}")
+                self.tr.warn(f"[{self}]: Access to message (id:{message_id}) is restricted until {unlock_day}")
                 return None
             
         self.tr.debug(f"[{self}]: Returning message (id:{message_id}) with key")
@@ -150,13 +177,14 @@ class Server:
             self.tr.error(f"[{self}]: Message (id:{message_id}) does not exist for user {username}")
             return None
         
-        message:Message = user.received_messages[message_id]
+        message = user.received_messages[message_id].copy()
+        unlock_day = AAD.decode(message["aad"]).unlock_day
 
-        if date.today() < message.aad.unlock_day:
-            self.tr.warn(f"[{self}]: Key for message (id:{message_id}) not available until {message.aad.unlock_day}")
+        if date.today() < unlock_day:
+            self.tr.warn(f"[{self}]: Key for message (id:{message_id}) not available until {unlock_day}")
             return None
         
-        return message.key
+        return message["enc_sym_key"]
         
     def __str__(self):
         return f"{self.name}"
