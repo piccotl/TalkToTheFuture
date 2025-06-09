@@ -57,7 +57,7 @@ class TalkToTheFutureCLI:
     
     def read_menu(self, client: Client) -> None:
         print_header(text=f'{client.name} - Read Menu', color='LIGHTCYAN_EX')
-        messages = client.get_my_messages()
+        messages = client.get_messages_aad()
         if not messages :
             self.tracer.colorprint("\nYou didn't receive any message!\n")
             return

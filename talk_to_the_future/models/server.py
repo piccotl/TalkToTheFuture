@@ -14,6 +14,15 @@ class Server:
 
     # Private Methods ---------------------------------------------------------------------
     def __get_user(self, username: str) -> UserInfos | None:
+        '''
+        Find `username` in self.__users list.
+        
+        Args:
+            `username` (str) : Desired user username.
+
+        Returns: 
+            UserInfos: Object containing informations on user (name, keys, received_messages)
+        '''
         for user in self.__users:
             if user.name == username:
                 return user
@@ -21,6 +30,16 @@ class Server:
         return None
     
     def __check_session(self, username : str, token: str) -> bool:
+        '''
+        Check if a given username has an active session.
+        
+        Args: 
+            `username` (str) : Name of the user.
+            `token` (str) : Token of the active session to be checked.
+        
+        Returns: 
+            bool : True if user is part of the connected users and the token is accurate, else False.
+        '''
         session = self.__sessions.get(username)
         if not session:
             self.tr.error(f'[{self}]: No active session found for {username}')
@@ -137,14 +156,14 @@ class Server:
         self.tr.info(f"[{self}]: Message sent to {receiver.name}.")         
         return True
     
-    def get_metadata(self, username: str, token: str) -> list[AAD] | None:
+    def get_messages_aad(self, username: str, token: str) -> list[AAD] | None:
         if not self.__check_session(username, token):
             return None        
         user = self.__get_user(username)
         self.tr.debug(f"[{self}]: Returning {username}'s messages")
         return [AAD.decode(msg["aad"]) for msg in user.received_messages]
     
-    def get_message(self, username: str, token: str, message_id: int, no_key: bool = False) -> dict[str, bytes] | None:
+    def get_message_payload(self, username: str, token: str, message_id: int, no_key: bool = False) -> dict[str, bytes] | None:
         if not self.__check_session(username, token):
             return None        
         user: UserInfos = self.__get_user(username)
