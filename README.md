@@ -47,7 +47,7 @@ Pour étudier l'implémentation de ce projet, merci de consulter le [README](./t
 
 Même si le contenu des messages est chiffré de bout en bout, les metadonnées échangées en clair peuvent donner des informations cruciales à un attaquant. Celle-ci contiennent, le nom d'utilisateur, le tag vérificateur de mot de passe, le sel associé, la date et le destinataire des messages, ainsi que le contenu même des messages qui, bien que chiffré, pourrait-être stocké par un adversaire passif qui écouterait simplement le canal pour un déchiffrement futur. Il est donc déterminant pour la sécurité du service d'utiliser un protocol pour chiffrer les communications entre le client et le serveur.
 
-![TLS](./docs/figures/TLS.png)
+![TLS](./docs/figures/tls.png)
 
 Dans ce but, c'est le protocol **TLS 1.3** qui a été retenu. Celui-ci permet :
 
